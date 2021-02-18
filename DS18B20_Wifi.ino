@@ -1,23 +1,23 @@
-// Thermometer-DS18B20
+// DS18B20_Wifi
 //
 // ©2021 by Charles Vercauteren 
-// 15 febrary 2021
+// 18 febrary 2021
 //
 // Tested on ARduino Uno Wifi.
 //
+// Nederlands:
+//
+// Applicatie:
+// -----------
 // Dit is een applicatie voor wifi configuratie software die ik geschreven heb. Er is ook een 
 // bijpassende app voor macOS geschreven. Het is mogelijk om de tijd, het log interval en de naam
-// in te stellen. We gebruiken hiertoe commando's die we mbv. UDP versturen/ontvangen.
+// in te stellen. We gebruiken hiertoe 1-byte commando's die we mbv. UDP versturen/ontvangen.
 // Verbinden via terminal op Mac, gebruik "sudo cu -s 9600 -l /dev/tty.usbmodem14102". Gebruik "~." 
 // om cu te verlaten (~ is Option-n).
+// Aanpassen van dit gedeelte van de sketch laat ook toe andere sensoren te gebruiken.
 //
-// This is an application for the wifi configuration software I wrote earlier. I have also
-// written an accompayning app voor macOS. Time, log interval and name can be configured. We
-// use commands that we send/receive using UDP.
-// Connection via terminal on Mac, use "sudo cu -s 9600 -l /dev/tty.usbmodem14102". Ise "~." to 
-// leave cu (~ is Option-n).
-//
-// Nederlands:
+// Wifi configuratie:
+// ------------------
 // Het SSID en wachtwoord voor het wifi-netwerk wordt gelezen uit EEPROM. Om deze waarden
 // te configureren zal een drukknop, aangesloten ts D2 (zie #define PIN_CONFIG) en GND, 
 // ons in het configuratiemenu brengen indien we deze ingedrukt houden bij een reset of 
@@ -27,6 +27,18 @@
 // Bij een volgende herstart of reset zullen dan deze waarden gebruikt worden.
 //
 // English:
+//
+// Application
+// -----------
+// This is an application for the wifi configuration software I wrote earlier. I have also
+// written an accompayning app voor macOS. Time, log interval and name can be configured. We
+// use 1-byte commands that we send/receive using UDP.
+// Connection via terminal on Mac, use "sudo cu -s 9600 -l /dev/tty.usbmodem14102". Ise "~." to 
+// leave cu (~ is Option-n).
+// By adapting this part of the software other sensor can be used.
+//
+// Wifi configuration:
+// -------------------
 // The SSID and password for the wifi-network will be read out of EEPROM. To configure these
 // values a pushbutton, connected between D2 (see #define PIN_CONFIG) and GND, will
 // show the configurationmenu when activated during powerup or reset.
@@ -77,7 +89,7 @@ int status = WL_IDLE_STATUS;      // Wifi radio status
 #define PIN_CONFIG   2
 bool configMode = false;          // Confifuration mode active.
 bool runOnce = true;              // Run code in loop only once.
-// --- Wifi/EEPROM includes einde ---
+// --- Wifi/EEPROM includes end ---
 
 
 // --- Thermometre includes begin ---
@@ -129,8 +141,8 @@ int indexLog = 0;
 
 
 void setup() {
-  // --- Wifi/EEPROM setup begin ---
- 
+  
+// --> Wifi/EEPROM setup begin ---
   // Initialize serial and wait for port to open:
   Serial.begin(9600);
   while (!Serial) {
@@ -155,9 +167,9 @@ void setup() {
     configMode = true; 
     Serial.println("Config button pressed.");
   }
-  // --- Wifi/EEPROM setup end ---
+// <-- Wifi/EEPROM setup end ---
 
-  // --- Thermometer setup begin ---
+// --> Thermometer setup begin ---
   // Start UDP server
   if (Udp.begin(localPort) != 1) {  
     Serial.println("UDP can't be started, stopping !");
@@ -173,12 +185,13 @@ void setup() {
   // Init temperatuur sensor
   byte data[8];
   ds.reset();
-  // --- Thermometer setup einde ---
+// <-- Thermometer setup einde ---
   
 }
 
 void loop() {
-  // --- Wifi/EEPROM loop begin ---
+  
+// --> Wifi/EEPROM loop begin ---
   if (configMode) {
     // Configmode
     // ----------
@@ -276,7 +289,7 @@ void loop() {
       Serial.println("RunOnce");
       // Connect to wifi
       // ---------------
-      // Lees ssid/wachtwoord/naam
+      // Read ssid/password/name
       ssid="";
       for (int i=0; i<MAX_CHAR; i++) { ssid+=(char)EEPROM.read(ssidAddress+i); }
       password="";
@@ -306,8 +319,6 @@ void loop() {
         Serial.print("  IP: "); Serial.println(fixedIp);
         }
       
-      // Maak verbinding met wifi netwerk
-      // --> Laat onderstaand commando weg indien DHCP gewenst is. <--
       if (!dhcpMode) { 
         ip.fromString(fixedIp.c_str());
         WiFi.config(ip);
@@ -321,42 +332,40 @@ void loop() {
         delay(10000);
       }
 
-      // We zijn verbonden, print wat info
+      // We'r" connected, print info.
       Serial.println("You're connected to the network");
       printCurrentNet();
       printWifiData();
-
-
       
       runOnce = false;
       Serial.println("Starting loop.");
-
     }
-    // --- Wifi/EEPROM loop einde ---
+// <-- Wifi/EEPROM loop end ---
+
     else {
-// --- Thermometer loop start ---
-     // Log the temperature
+      
+// --> Thermometer loop begin ---
+
+      // Measure and log temperature
       currentTemperature = measureTemperature();
       logTemperature();
       
-      // String voor client
+      // Replystring for client
       String replyString = "";
 
-      // Data beschikbaar, lees
+      // Read data from client
       int packetSize = Udp.parsePacket();
-
       if (packetSize) {
-        // Plaats data in packetBuffer
+        // Data to packetBuffer
         int len = Udp.read(packetBuffer, 255);
         if (len > 0) {
-          packetBuffer[len] = 0;    // Maak c-string van buffer
+          packetBuffer[len] = 0;    // Make c-string from buffer data
         }
 
-        // Converteer vraag naar integer, commando's zie hoger.
+        // Convert question from client to integer, commandos see higher.
         command = String(packetBuffer).toInt();
-        // Maak het antwoord voor de client, dit bestaat uit het
-        // commando + " " + resultaat op dat de client het antwoord
-        // niet verkeer zou interpreteren.
+        // Create reply for client = command + " " + result
+        // so client knows for which question the answer applies
         replyString = String(command) + " ";
         switch (command) {
           case GET_TEMPERATURE:
@@ -411,14 +420,15 @@ void loop() {
       }
   
       // updateClock creates 1s delay independant of run time loop
+      // !!! This is not accurate enough !!!
       updateClock();
       
-    // --- Thermometer loop einde ---  
+// <-- Thermometer loop end ---  
     }
   }
 }
 
-// --- EEPROM functies begin ---
+// --> EEPROM functions begin ---
 
 void saveSsidToEeprom(String name) {
   for (int i=0; i<MAX_CHAR; i++) {
@@ -453,10 +463,11 @@ void saveIpAddressToEeprom(String name) {
   }
 }
 
-// --- EEPROM functies einde ---
+// <-- EEPROM functions end ---
 
 
-// --- Wifi functies begin ---
+// --> Wifi functions begin ---
+
 void printWifiData() {
   // Print IP-adres:
   IPAddress ip = WiFi.localIP();
@@ -508,17 +519,18 @@ void printMacAddress(byte mac[]) {
 }
 
 void recvString() {
-  // Controleer of nieuwe data op seriële aanwezig is.
-  // Zoja, lees deze in. END_MARKER aanwezig, sluit dan de string af met '\0' 
-  // om geldige C-string van te maken en zet "dataAvailable" true.
-  // Controleer en houd het aantal karakters kleiner dan MAX_CHAR
+  // Check for new data on serial.
+  // If so, read it. If END_MARKER, close string with '\0'
+  // to create a valid C-string. Make "dataAvailable" true.
+  // Check the number of characters is smaller then  MAX_CHAR
+  // and limit if necessary.
   
   static byte ndx = 0;
   char rc;
 
   while (Serial.available() > 0 && dataAvailable == false) {
     rc = Serial.read();
-    Serial.print(rc);       //echo karakter
+    Serial.print(rc);       //echo character
 
     if (rc != CR && rc != LF) {
       receivedChars[ndx] = rc;
@@ -534,12 +546,13 @@ void recvString() {
     }
   }
 }
-// --- Wifi functies einde ---
+// <-- Wifi functions end ---
 
-// --- Thermometer functies begin ---
+// --> Thermometer functions begin ---
 
 float measureTemperature() {
-  //temperatuur meten
+  // returns the temperatue in °C
+  
   byte data[2];
   ds.reset(); 
   //Select all devices on bus and
@@ -553,16 +566,16 @@ float measureTemperature() {
   ds.write(0xBE);
   data[0] = ds.read(); 
   data[1] = ds.read();
-  float Temp = 256*data[1] + data[0];
-  if (Temp >= 32768) {
-    //Positive temp
-    //Nog testen (als het vriest :-) )
-    Temp = 65536 - Temp;
+  float temperature = 256*data[1] + data[0];
+  if (temperature >= 32768) {
+    // Positive temp
+    // !!! Must be tested for negative temperatures !!!
+    temperature = 65536 - temperature;
   }
-  Temp = Temp/16;
+  temperature = temperature/16;
 
-  Serial.println(Temp);
-  return(Temp);
+  Serial.println(temperature);
+  return(temperature);
 }
 
 void logTemperature() {
@@ -602,9 +615,6 @@ String buildTimeString() {
 void updateClock() {
   // Update clock every second
 
-  // Flash LED on board to check running normal, see main loop
-  ledOnOff = !ledOnOff;
-
   #ifdef DEBUG
   //Serial.print("Free memory: "); Serial.println(freeMemory());
   #endif
@@ -628,4 +638,4 @@ void updateClock() {
   // Update logging timer
   logSeconds += 1;
 }
-// --- Thermometer functies einde ---
+// <-- Thermometer functions end ---
