@@ -381,6 +381,7 @@ void loop() {
             break;
           case SET_LOG_INTERVAL:
             maxLogSeconds = String(packetBuffer).substring(3).toInt();
+            replyString += String(maxLogSeconds);
             break;
           case GET_LOG_INTERVAL:
             replyString += String(maxLogSeconds);
